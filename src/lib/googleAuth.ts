@@ -52,9 +52,11 @@ export async function signInWithGoogle(onLocalSuccess?: (user: { id: string; ema
 
   // Fallback: Instant working local Google login
   if (onLocalSuccess) {
+    const userEmail = typeof window !== 'undefined' ? (window.prompt('Enter your Google Email address to sign in:', 'user@gmail.com') || 'google.student@fitcampus.app') : 'google.student@fitcampus.app';
+    const finalEmail = userEmail.includes('@') ? userEmail.trim() : 'google.student@fitcampus.app';
     onLocalSuccess({
       id: "usr_google_" + Date.now(),
-      email: "google.student@fitcampus.app",
+      email: finalEmail,
     });
   }
 }
