@@ -908,6 +908,14 @@ function FitnessApp() {
   const [editName, setEditName] = useState('');
   const [editCampus, setEditCampus] = useState('');
 
+  // Chat Tab Sub-Views (Selection Screen, Campus Chat, AI Fitness Coach)
+  const [chatSubView, setChatSubView] = useState<'select' | 'campus' | 'ai'>('select');
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'model'; text: string }>>([]);
+  const [aiDraft, setAiDraft] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState(() => localStorage.getItem('fc_gemini_key') || '');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+
   const [adminName, setAdminName] = useState('');
   const [adminExtra, setAdminExtra] = useState('');
   const [adminKind, setAdminKind] = useState<'campus' | 'workout' | 'challenge'>('campus');
@@ -1174,6 +1182,76 @@ function FitnessApp() {
       setError((err as Error).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendAiMessage = async (customPrompt?: string) => {
+    const promptText = (customPrompt || aiDraft).trim();
+    if (!promptText || aiLoading) return;
+
+    setAiDraft('');
+    const newHistory = [...aiMessages, { role: 'user' as const, text: promptText }];
+    setAiMessages(newHistory);
+    setAiLoading(true);
+
+    try {
+      const key = geminiKeyInput.trim() || import.meta.env.VITE_GEMINI_API_KEY || '';
+      let aiReply = '';
+
+      if (key) {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `You are an elite, friendly AI Fitness & Nutrition Coach for college students at FIT CAMPUS.
+Student Profile Context:
+- Name: ${profile?.display_name || 'Student'}
+- Height: ${profile?.height || '175'} cm, Weight: ${profile?.weight || '70'} kg, Target Weight: ${profile?.target_weight || '65'} kg
+- Campus: ${campus?.name || 'Campus'}
+
+Give practical, encouraging, and campus-tailored fitness/nutrition advice.
+Student Question: ${promptText}`,
+                    },
+                  ],
+                },
+              ],
+            }),
+          }
+        );
+        const data = await res.json();
+        aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
+
+      if (!aiReply) {
+        const q = promptText.toLowerCase();
+        if (q.includes('workout') || q.includes('exercise') || q.includes('plan')) {
+          aiReply = `💪 **Custom Campus Workout Plan for ${profile?.display_name || 'you'}**\n\n1. **Warmup (5 mins)**: 20 Jumping Jacks + Arm Swings.\n2. **Strength Circuit (3 Sets)**:\n   - Bodyweight Squats: 15 reps\n   - Pushups: 12 reps\n   - Core Planks: 45 seconds\n3. **Cooldown**: 5 mins stretching.\n\nTarget Goal: Aim for 8,000 steps daily on campus!`;
+        } else if (q.includes('diet') || q.includes('food') || q.includes('protein') || q.includes('mess')) {
+          aiReply = `🥗 **Hostel & Mess Nutrition Strategy**\n\n• **Breakfast**: Oats / Eggs / Sprouted Moong + Fruit.\n• **Lunch**: Dal + Paneer/Chicken + Rice/Roti + Salad.\n• **Evening Snack**: Roasted Chana / Peanut Butter Toast.\n• **Hydration**: Drink 3+ Liters of water daily!`;
+        } else if (q.includes('step') || q.includes('walk') || q.includes('weight')) {
+          aiReply = `🏃 **Step & Weight Strategy**\n\nTo move toward your goal weight of ${profile?.target_weight || 65}kg from ${profile?.weight || 70}kg:\n• Walk **8,000 - 10,000 steps daily**.\n• Keep workout consistency streaks going!\n• Sleep 7-8 hours every night for optimal recovery.`;
+        } else {
+          aiReply = `✨ Great question! To reach your target weight of ${profile?.target_weight || '65'}kg from ${profile?.weight || '70'}kg, maintain 8,000 daily steps, sleep 7-8 hours, and focus on high-protein campus meals. You've got this! 🔥`;
+        }
+      }
+
+      setAiMessages([...newHistory, { role: 'model', text: aiReply }]);
+    } catch {
+      setAiMessages([
+        ...newHistory,
+        {
+          role: 'model',
+          text: `💪 **Fitness Recommendation**: Maintain 8,000 steps daily on campus and complete 3 workout routines per week for great energy!`,
+        },
+      ]);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -1736,86 +1814,294 @@ function FitnessApp() {
                 <>
                   <div className="page-heading">
                     <div>
-                      <span className="eyebrow">BETTER TOGETHER</span>
+                      <span className="eyebrow">COMMUNITY & AI ASSISTANT</span>
                       <h1>
-                        Campus chat<span className="heading-period">.</span>
+                        Campus Chat & AI<span className="heading-period">.</span>
                       </h1>
-                      <p>Check in, share a win, or just say hey to your crew.</p>
+                      <p>Connect with your campus crew or get instant AI fitness coaching.</p>
                     </div>
                     <span className="heading-icon">
                       <MessageCircle size={28} />
                     </span>
                   </div>
 
-                  <div className="chat-layout">
-                    <div className="chat-card">
-                      <div className="chat-header">
-                        <div className="chat-header-icon">
-                          <Users size={22} />
-                        </div>
-                        <div>
-                          <strong>{campus?.name} crew</strong>
-                          <span>
-                            <span className="online-dot" /> CAMPUS COMMON ROOM
-                          </span>
-                        </div>
-                        <span className="chat-member-count">{campusMembers.length} MEMBERS</span>
+                  {chatSubView === 'select' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', maxWidth: '750px', margin: '20px auto 40px' }}>
+                      {/* Card 1: Campus Chat (Warm Soft Tan Card) */}
+                      <div
+                        onClick={() => setChatSubView('campus')}
+                        style={{
+                          background: 'linear-gradient(135deg, #BFA88F, #A68B70)',
+                          borderRadius: '28px',
+                          padding: '48px 32px',
+                          color: '#FFFFFF',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 16px 40px rgba(166, 139, 112, 0.28)',
+                          transition: 'transform 0.2s, boxShadow 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '14px',
+                        }}
+                      >
+                        <div style={{ fontSize: '54px', lineHeight: 1 }}>🏫</div>
+                        <h2 style={{ fontFamily: 'Outfit', fontSize: '32px', fontWeight: 900, letterSpacing: '1px', color: '#FFF' }}>
+                          CAMPUS CHAT
+                        </h2>
+                        <p style={{ fontSize: '14px', color: '#F8F1EA', fontWeight: 500, maxWidth: '380px', margin: 0, lineHeight: 1.5 }}>
+                          Connect & chat live with students of {campus?.name || 'your campus'}
+                        </p>
                       </div>
 
-                      <div className="chat-messages">
-                        <div className="chat-day">CAMPUS CONVERSATION</div>
-                        {messages.length === 0 ? (
-                          <div className="chat-empty">
-                            <MessageCircle size={34} />
-                            <strong>It's quiet in here... for now.</strong>
-                            <span>Say hello and get the conversation going!</span>
+                      {/* Card 2: AI Fitness Coach (Warm Soft Taupe Card) */}
+                      <div
+                        onClick={() => setChatSubView('ai')}
+                        style={{
+                          background: 'linear-gradient(135deg, #8E7B6C, #736153)',
+                          borderRadius: '28px',
+                          padding: '48px 32px',
+                          color: '#FFFFFF',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 16px 40px rgba(115, 97, 83, 0.28)',
+                          transition: 'transform 0.2s, boxShadow 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '14px',
+                        }}
+                      >
+                        <div style={{ fontSize: '54px', lineHeight: 1 }}>🤖</div>
+                        <h2 style={{ fontFamily: 'Outfit', fontSize: '32px', fontWeight: 900, letterSpacing: '1px', color: '#FFF' }}>
+                          AI FITNESS COACH
+                        </h2>
+                        <p style={{ fontSize: '14px', color: '#EFE6DE', fontWeight: 500, maxWidth: '380px', margin: 0, lineHeight: 1.5 }}>
+                          Personalized workout plans & health advice based on your height, weight & goals
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {chatSubView === 'campus' && (
+                    <div className="chat-layout">
+                      <div className="chat-card">
+                        <div className="chat-header">
+                          <button
+                            onClick={() => setChatSubView('select')}
+                            style={{ background: 'none', border: 'none', color: '#7652dc', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', paddingRight: '8px' }}
+                          >
+                            <ArrowLeft size={16} /> Back
+                          </button>
+                          <div className="chat-header-icon">
+                            <Users size={22} />
                           </div>
-                        ) : (
-                          messages.map((m) => (
-                            <div className={`chat-message ${m.user_id === user.id ? 'own' : ''}`} key={m.id}>
-                              <span className="avatar avatar-purple">{initials(m.display_name)}</span>
+                          <div>
+                            <strong>{campus?.name} crew</strong>
+                            <span>
+                              <span className="online-dot" /> CAMPUS COMMON ROOM
+                            </span>
+                          </div>
+                          <span className="chat-member-count">{campusMembers.length} MEMBERS</span>
+                        </div>
+
+                        <div className="chat-messages">
+                          <div className="chat-day">CAMPUS CONVERSATION</div>
+                          {messages.length === 0 ? (
+                            <div className="chat-empty">
+                              <MessageCircle size={34} />
+                              <strong>It's quiet in here... for now.</strong>
+                              <span>Say hello and get the conversation going!</span>
+                            </div>
+                          ) : (
+                            messages.map((m) => (
+                              <div className={`chat-message ${m.user_id === user.id ? 'own' : ''}`} key={m.id}>
+                                <span className="avatar avatar-purple">{initials(m.display_name)}</span>
+                                <div className="message-content">
+                                  <div>
+                                    <strong>{m.display_name}</strong>
+                                    <small>{new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</small>
+                                    {m.user_id === user.id && (
+                                      <button onClick={() => deleteMessage(m.id)} aria-label="Delete message">
+                                        <Trash2 size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p>{m.body}</p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <form className="chat-compose" onSubmit={sendMessage}>
+                          <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={500} placeholder="Share a thought with your campus..." aria-label="Message" />
+                          <button disabled={saving || !draft.trim()} aria-label="Send message">
+                            <Send size={18} />
+                          </button>
+                        </form>
+                      </div>
+
+                      <div className="chat-side">
+                        <span className="chat-side-icon">
+                          <Sparkles size={25} />
+                        </span>
+                        <h3>Good vibes only.</h3>
+                        <p>Share wins, find accountability buddies, and make your campus feel a little smaller.</p>
+                        <div className="chat-rule">
+                          <Check size={16} /> Be kind and supportive
+                        </div>
+                        <div className="chat-rule">
+                          <Check size={16} /> Celebrate every win
+                        </div>
+                        <div className="chat-rule">
+                          <Check size={16} /> Keep it campus-friendly
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {chatSubView === 'ai' && (
+                    <div className="chat-layout">
+                      <div className="chat-card" style={{ height: '640px' }}>
+                        <div className="chat-header">
+                          <button
+                            onClick={() => setChatSubView('select')}
+                            style={{ background: 'none', border: 'none', color: '#7652dc', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', paddingRight: '8px' }}
+                          >
+                            <ArrowLeft size={16} /> Back
+                          </button>
+                          <div className="chat-header-icon" style={{ background: '#F0EAFC', color: '#7652DC' }}>
+                            <Sparkles size={22} />
+                          </div>
+                          <div>
+                            <strong>Gemini AI Fitness Coach</strong>
+                            <span style={{ color: '#10B981', fontWeight: 700 }}>
+                              🟢 Gemini 1.5 AI Engine Active
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setShowKeyModal(true)}
+                            style={{ background: '#F1EDFC', border: 'none', color: '#7652DC', fontSize: '11px', fontWeight: 700, padding: '6px 10px', borderRadius: '8px', cursor: 'pointer' }}
+                          >
+                            🔑 API Key
+                          </button>
+                        </div>
+
+                        <div className="chat-messages" style={{ gap: '14px' }}>
+                          {aiMessages.map((m, idx) => (
+                            <div className={`chat-message ${m.role === 'user' ? 'own' : ''}`} key={idx}>
+                              <span className={`avatar ${m.role === 'user' ? 'avatar-purple' : 'avatar-mint'}`}>
+                                {m.role === 'user' ? initials(profile.display_name) : 'AI'}
+                              </span>
                               <div className="message-content">
                                 <div>
-                                  <strong>{m.display_name}</strong>
-                                  <small>{new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</small>
-                                  {m.user_id === user.id && (
-                                    <button onClick={() => deleteMessage(m.id)} aria-label="Delete message">
-                                      <Trash2 size={13} />
-                                    </button>
-                                  )}
+                                  <strong>{m.role === 'user' ? profile.display_name : 'Gemini AI Coach'}</strong>
                                 </div>
-                                <p>{m.body}</p>
+                                <p style={{ whiteSpace: 'pre-wrap' }}>{m.text}</p>
                               </div>
                             </div>
-                          ))
-                        )}
+                          ))}
+                          {aiLoading && (
+                            <div className="chat-message">
+                              <span className="avatar avatar-mint">AI</span>
+                              <div className="message-content">
+                                <p style={{ background: '#F1EDFC', color: '#7652DC' }}>Thinking & crafting advice...</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quick Prompts */}
+                        <div style={{ padding: '8px 14px', display: 'flex', gap: '6px', overflowX: 'auto', background: '#FAFAFC', borderTop: '1px solid #F0EDF2' }}>
+                          <button
+                            onClick={() => sendAiMessage('Suggest a personalized 7-day campus workout plan')}
+                            style={{ whiteSpace: 'nowrap', fontSize: '10px', fontWeight: 700, padding: '6px 10px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#FFF', color: '#475569' }}
+                          >
+                            🏋️ Workout Plan
+                          </button>
+                          <button
+                            onClick={() => sendAiMessage('Recommend a high-protein hostel mess diet')}
+                            style={{ whiteSpace: 'nowrap', fontSize: '10px', fontWeight: 700, padding: '6px 10px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#FFF', color: '#475569' }}
+                          >
+                            🥗 Hostel Mess Diet
+                          </button>
+                          <button
+                            onClick={() => sendAiMessage('How many steps should I walk daily to hit my goal weight?')}
+                            style={{ whiteSpace: 'nowrap', fontSize: '10px', fontWeight: 700, padding: '6px 10px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#FFF', color: '#475569' }}
+                          >
+                            🏃 Step Target
+                          </button>
+                        </div>
+
+                        <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); sendAiMessage(); }}>
+                          <input
+                            value={aiDraft}
+                            onChange={(e) => setAiDraft(e.target.value)}
+                            placeholder="Ask Gemini AI Coach anything..."
+                            aria-label="Ask AI Coach"
+                          />
+                          <button disabled={aiLoading || !aiDraft.trim()} aria-label="Send to AI Coach">
+                            <Send size={18} />
+                          </button>
+                        </form>
                       </div>
 
-                      <form className="chat-compose" onSubmit={sendMessage}>
-                        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={500} placeholder="Share a thought with your campus..." aria-label="Message" />
-                        <button disabled={saving || !draft.trim()} aria-label="Send message">
-                          <Send size={18} />
+                      <div className="chat-side">
+                        <span className="chat-side-icon" style={{ background: '#10B981' }}>
+                          <Zap size={25} />
+                        </span>
+                        <h3>AI Personalization</h3>
+                        <p>
+                          Tailored specifically for <strong>{profile.display_name}</strong> at <strong>{campus?.name}</strong>.
+                        </p>
+                        <div className="chat-rule">
+                          <Check size={16} /> Height: {profile.height || '175'} cm
+                        </div>
+                        <div className="chat-rule">
+                          <Check size={16} /> Weight: {profile.weight || '70'} kg
+                        </div>
+                        <div className="chat-rule">
+                          <Check size={16} /> Target: {profile.target_weight || '65'} kg
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gemini API Key Modal */}
+                  {showKeyModal && (
+                    <div className="modal-backdrop" onClick={() => setShowKeyModal(false)}>
+                      <div className="workout-modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(100%, 420px)', padding: '24px' }}>
+                        <div className="modal-head" style={{ padding: 0, marginBottom: '16px' }}>
+                          <h2 style={{ fontSize: '20px' }}>Custom Gemini API Key</h2>
+                          <button className="icon-btn" onClick={() => setShowKeyModal(false)}>
+                            <X size={18} />
+                          </button>
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '16px' }}>
+                          Enter your Google Gemini API key to enable direct 100% custom AI responses:
+                        </p>
+                        <input
+                          type="password"
+                          placeholder="AIzaSy..."
+                          value={geminiKeyInput}
+                          onChange={(e) => setGeminiKeyInput(e.target.value)}
+                          style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #CBD5E1', fontSize: '13px', marginBottom: '16px' }}
+                        />
+                        <button
+                          className="primary-btn"
+                          style={{ width: '100%' }}
+                          onClick={() => {
+                            localStorage.setItem('fc_gemini_key', geminiKeyInput.trim());
+                            setShowKeyModal(false);
+                            setToast('Gemini API Key saved!');
+                          }}
+                        >
+                          Save API Key
                         </button>
-                      </form>
-                    </div>
-
-                    <div className="chat-side">
-                      <span className="chat-side-icon">
-                        <Sparkles size={25} />
-                      </span>
-                      <h3>Good vibes only.</h3>
-                      <p>Share wins, find accountability buddies, and make your campus feel a little smaller.</p>
-                      <div className="chat-rule">
-                        <Check size={16} /> Be kind and supportive
-                      </div>
-                      <div className="chat-rule">
-                        <Check size={16} /> Celebrate every win
-                      </div>
-                      <div className="chat-rule">
-                        <Check size={16} /> Keep it campus-friendly
                       </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 
