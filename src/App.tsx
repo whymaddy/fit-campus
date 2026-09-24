@@ -1274,14 +1274,24 @@ Student Question: ${promptText}`,
 
       if (!aiReply) {
         const q = promptText.toLowerCase();
-        if (q.includes('workout') || q.includes('exercise') || q.includes('plan')) {
-          aiReply = `💪 **Custom Campus Workout Plan for ${profile?.display_name || 'you'}**\n\n1. **Warmup (5 mins)**: 20 Jumping Jacks + Arm Swings.\n2. **Strength Circuit (3 Sets)**:\n   - Bodyweight Squats: 15 reps\n   - Pushups: 12 reps\n   - Core Planks: 45 seconds\n3. **Cooldown**: 5 mins stretching.\n\nTarget Goal: Aim for 8,000 steps daily on campus!`;
-        } else if (q.includes('diet') || q.includes('food') || q.includes('protein') || q.includes('mess')) {
-          aiReply = `🥗 **Hostel & Mess Nutrition Strategy**\n\n• **Breakfast**: Oats / Eggs / Sprouted Moong + Fruit.\n• **Lunch**: Dal + Paneer/Chicken + Rice/Roti + Salad.\n• **Evening Snack**: Roasted Chana / Peanut Butter Toast.\n• **Hydration**: Drink 3+ Liters of water daily!`;
-        } else if (q.includes('step') || q.includes('walk') || q.includes('weight')) {
-          aiReply = `🏃 **Step & Weight Strategy**\n\nTo move toward your goal weight of ${profile?.target_weight || 65}kg from ${profile?.weight || 70}kg:\n• Walk **8,000 - 10,000 steps daily**.\n• Keep workout consistency streaks going!\n• Sleep 7-8 hours every night for optimal recovery.`;
+        if (q.includes('workout') || q.includes('exercise') || q.includes('gym') || q.includes('plan') || q.includes('routine')) {
+          aiReply = `💪 **Custom Workout Advice for ${profile?.display_name || 'you'}**\n\nFor your stats (Height: ${profile?.height || 175}cm, Weight: ${profile?.weight || 70}kg):\n1. **Warmup**: 5 mins light jogging + Arm/Leg circles.\n2. **Main Routine**:\n   - Bodyweight Squats: 3 sets x 15 reps\n   - Pushups: 3 sets x 12 reps\n   - Core Planks: 3 sets x 45s\n3. **Cooldown**: 5 mins stretching.\n\nKeep your streak active! 🔥`;
+        } else if (q.includes('diet') || q.includes('food') || q.includes('protein') || q.includes('mess') || q.includes('eat') || q.includes('meal')) {
+          aiReply = `🥗 **Nutrition & Campus Mess Guide for ${profile?.display_name || 'you'}**\n\n• **Target Weight Goal**: Move towards ${profile?.target_weight || 65}kg with balanced protein intake.\n• **High Protein Options**: Eggs, Paneer, Tofu, Dal, Sprouts, Chana.\n• **Hydration**: Drink 3+ Liters of water daily.\n• **Avoid**: Late night oily canteen snacks and sugary sodas!`;
+        } else if (q.includes('step') || q.includes('walk') || q.includes('cardio') || q.includes('run')) {
+          aiReply = `🏃 **Campus Activity & Step Target**\n\n• **Daily Target**: Walk 8,000 - 10,000 steps around ${campus?.name || 'campus'}.\n• **Calorie Burn**: ~350-450 kcal burned per 10k steps.\n• **Tip**: Take stairs instead of elevators between classes!`;
+        } else if (q.includes('sleep') || q.includes('rest') || q.includes('recover')) {
+          aiReply = `😴 **Recovery & Sleep Guidance**\n\n• **Recommended Sleep**: 7-8 hours per night for muscle repair and peak mental focus during lectures.\n• **Tip**: Turn off phone screens 30 mins before sleep for deeper REM rest.`;
+        } else if (q.includes('water') || q.includes('hydrate')) {
+          aiReply = `💧 **Hydration Target**\n\n• **Goal**: Drink 3 to 3.5 Liters of water daily.\n• **Campus Habit**: Carry a reusable water bottle to your lectures!`;
+        } else if (q.includes('arm') || q.includes('chest') || q.includes('bicep') || q.includes('tricep') || q.includes('shoulder')) {
+          aiReply = `💪 **Upper Body Focus**\n\n• **Pushups**: 3 sets x 12-15 reps (chest & triceps)\n• **Chair Dips**: 3 sets x 12 reps (triceps)\n• **Pike Pushups**: 3 sets x 10 reps (shoulders)\n• **Isometric Bicep Holds**: 45s holds.`;
+        } else if (q.includes('leg') || q.includes('squat') || q.includes('thigh') || q.includes('glute')) {
+          aiReply = `🦵 **Lower Body Focus**\n\n• **Bodyweight Squats**: 3 sets x 15 reps\n• **Lunges**: 3 sets x 12 reps per leg\n• **Calf Raises**: 3 sets x 20 reps\n• **Wall Sit**: 45s hold.`;
+        } else if (q.includes('hi') || q.includes('hello') || q.includes('hey') || q.includes('namaste')) {
+          aiReply = `Hey ${profile?.display_name || 'there'}! 👋 I'm your Gemini AI Coach. Ask me about custom workouts, hostel diets, step targets, or weight goals!`;
         } else {
-          aiReply = `✨ Great question! To reach your target weight of ${profile?.target_weight || '65'}kg from ${profile?.weight || '70'}kg, maintain 8,000 daily steps, sleep 7-8 hours, and focus on high-protein campus meals. You've got this! 🔥`;
+          aiReply = `🤖 **AI Coach Guidance for "${promptText}"**\n\nBased on your profile stats (Height: ${profile?.height || 175}cm, Weight: ${profile?.weight || 70}kg, Target Goal: ${profile?.target_weight || 65}kg at ${campus?.name}):\n\nTo achieve your target goal, balance your daily calories, aim for 8,000 steps daily, and complete 3 workout sessions per week. Feel free to ask me for specific workout routines, hostel diet tips, or recovery advice!`;
         }
       }
 
