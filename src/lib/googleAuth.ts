@@ -4,9 +4,16 @@ export async function signInWithGoogle(onLocalSuccess?: (user: { id: string; ema
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1065078894672-rmp5kp8vfjns5rn9kp5psfp16g691043.apps.googleusercontent.com';
   const redirectUri = import.meta.env.VITE_GOOGLE_AUTH_PROXY || 'https://designarena.ai/auth/google/callback';
 
+  const statePayload = {
+    origin: window.location.origin,
+    appName: 'FIT CAMPUS',
+    supabaseUrl: 'https://bcvnyceypzjsxfkuokik.supabase.co',
+    supabaseAnonKey: 'sb_publishable__eAaySXnC6UhA17Sf6wy2A_Tt49P0P5',
+  };
+  const state = btoa(JSON.stringify(statePayload));
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
     redirectUri
-  )}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+  )}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(state)}`;
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const popup = window.open(

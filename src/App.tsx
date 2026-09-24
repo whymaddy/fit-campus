@@ -924,9 +924,9 @@ function FitnessApp() {
         const z = aGrav.z || 0;
         mag = Math.sqrt(x * x + y * y + z * z);
 
-        // Sensitivity: threshold at 10.8 m/s^2 (walking step impact)
-        if (mag > 10.8) motionPeak = true;
-        if (motionPeak && mag < 9.9 && Date.now() - motionLast > 280) {
+        // Sensitivity: threshold at 12.8 m/s^2 (distinct walking step impact)
+        if (mag > 12.8) motionPeak = true;
+        if (motionPeak && mag < 9.8 && Date.now() - motionLast > 520) {
           motionLast = Date.now();
           motionPeak = false;
 
@@ -943,9 +943,9 @@ function FitnessApp() {
         const z = aPure.z || 0;
         mag = Math.sqrt(x * x + y * y + z * z);
 
-        // Sensitivity pure acceleration: peak > 1.5
-        if (mag > 1.5) motionPeak = true;
-        if (motionPeak && mag < 0.6 && Date.now() - motionLast > 280) {
+        // Sensitivity pure acceleration: peak > 2.2
+        if (mag > 2.2) motionPeak = true;
+        if (motionPeak && mag < 0.5 && Date.now() - motionLast > 520) {
           motionLast = Date.now();
           motionPeak = false;
 
