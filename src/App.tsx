@@ -553,26 +553,29 @@ function AuthScreen({ campuses }: { campuses: Campus[] }) {
   );
 }
 
-function Setup({ campuses, onSave, loading }: { campuses: Campus[]; onSave: (name: string, campus: number) => Promise<void>; loading: boolean }) {
+function Setup({ campuses, onSave, loading }: { campuses: Campus[]; onSave: (name: string, campus: number, height: number, weight: number, targetWeight: number) => Promise<void>; loading: boolean }) {
   const [name, setName] = useState('');
   const [campus, setCampus] = useState('');
+  const [height, setHeight] = useState('175');
+  const [weight, setWeight] = useState('70');
+  const [targetWeight, setTargetWeight] = useState('65');
   const [error, setError] = useState('');
   return (
     <div className="setup-page">
       <div className="setup-top">
         <Brand />
-        <span>01 / 01 — THE BASICS</span>
+        <span>01 / 01 — YOUR PROFILE & GOALS</span>
       </div>
       <div className="setup-card">
         <div className="setup-icon">
           <Sparkles size={29} />
         </div>
-        <span className="eyebrow">LET'S MAKE IT OFFICIAL</span>
+        <span className="eyebrow">WELCOME TO FIT CAMPUS</span>
         <h1>
-          Hey, future<br />
+          Set your goals,<br />
           <em>campus legend.</em>
         </h1>
-        <p>Just two quick things, then you're in.</p>
+        <p>Tell us your details so we can tailor your workouts and AI fitness coaching.</p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -582,7 +585,13 @@ function Setup({ campuses, onSave, loading }: { campuses: Campus[]; onSave: (nam
             }
             setError('');
             try {
-              await onSave(name.trim(), Number(campus));
+              await onSave(
+                name.trim(),
+                Number(campus),
+                Number(height) || 175,
+                Number(weight) || 70,
+                Number(targetWeight) || 65
+              );
             } catch (err) {
               setError((err as Error).message);
             }
@@ -603,6 +612,41 @@ function Setup({ campuses, onSave, loading }: { campuses: Campus[]; onSave: (nam
               ))}
             </select>
           </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <label>
+              Height (cm)
+              <select value={height} onChange={(e) => setHeight(e.target.value)}>
+                {Array.from({ length: 71 }, (_, i) => 140 + i).map((h) => (
+                  <option key={h} value={h}>
+                    {h} cm
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Current Weight (kg)
+              <select value={weight} onChange={(e) => setWeight(e.target.value)}>
+                {Array.from({ length: 91 }, (_, i) => 40 + i).map((w) => (
+                  <option key={w} value={w}>
+                    {w} kg
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Target Weight Goal (kg)
+            <select value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)}>
+              {Array.from({ length: 91 }, (_, i) => 40 + i).map((tw) => (
+                <option key={tw} value={tw}>
+                  🎯 Goal: {tw} kg
+                </option>
+              ))}
+            </select>
+          </label>
+
           {error && <div className="form-error">{error}</div>}
           <button className="primary-btn" disabled={loading}>
             {loading ? 'Setting things up...' : "Let's go"}
@@ -1094,13 +1138,13 @@ function FitnessApp() {
     setIntroDone(true);
   };
 
-  const setup = async (name: string, campusId: number) => {
+  const setup = async (name: string, campusId: number, height: number, weight: number, targetWeight: number) => {
     if (!user) return;
     setSaving(true);
     try {
-      const newProfile = LocalDb.saveProfile(user.id, name, campusId);
+      const newProfile = LocalDb.saveProfile(user.id, name, campusId, height, weight, targetWeight);
       setProfiles(LocalDb.getProfiles());
-      setToast('Welcome to the crew! Your journey starts now.');
+      setToast('Welcome to the crew! Your goals & profile are saved.');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -2152,35 +2196,6 @@ Student Question: ${promptText}`,
                         </div>
                       </div>
 
-                      <div className="white-panel">
-                        <div className="panel-head">
-                          <div>
-                            <span className="eyebrow">KEEP IT CURRENT</span>
-                            <h2>Your details</h2>
-                          </div>
-                          <Settings2 size={20} />
-                        </div>
-                        <form className="profile-form" onSubmit={saveProfile}>
-                          <label>
-                            Display name
-                            <input value={editName} onChange={(e) => setEditName(e.target.value)} required maxLength={35} />
-                          </label>
-                          <label>
-                            Campus
-                            <select value={editCampus} onChange={(e) => setEditCampus(e.target.value)} required>
-                              {campuses.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <button className="primary-btn" disabled={saving}>
-                            Save changes <ArrowRight size={17} />
-                          </button>
-                        </form>
-                      </div>
-
                       <div className="white-panel activity-panel">
                         <div className="panel-head">
                           <div>
@@ -2208,57 +2223,15 @@ Student Question: ${promptText}`,
 
                     <div className="profile-side">
                       <div className="steps-card">
-                        <span className="eyebrow light">AUTO-STEP ACCELEROMETER & GOOGLE FIT</span>
+                        <span className="eyebrow light">AUTO-STEP ACCELEROMETER</span>
                         <Footprints size={35} />
                         <h3>Walk it out.</h3>
-                        <p>Steps count automatically while moving & sync from Google Fit when app re-opens.</p>
+                        <p>Steps count automatically whenever your phone moves.</p>
                         <div className="steps-session">
                           <strong>{todaySteps.toLocaleString()}</strong>
                           <span>TOTAL STEPS TODAY</span>
                         </div>
-                        <button
-                          onClick={async () => {
-                            if (!user) return;
-                            setSaving(true);
-                            setToast('Connecting to Google Fit REST API...');
-                            try {
-                              const fitSteps = await syncGoogleFitSteps();
-                              if (fitSteps > 0) {
-                                const diff = Math.max(0, fitSteps - todaySteps);
-                                const added = diff > 0 ? diff : fitSteps;
-                                LocalDb.addLog(user.id, 'steps', null, added, Math.floor(added / 10));
-                                setLogs(LocalDb.getLogs(user.id));
-                                setProfiles(LocalDb.getProfiles());
-                                setToast(`✅ Synced ${added.toLocaleString()} steps from Google Fit!`);
-                              } else {
-                                setToast('Google Fit synced: 1,250 background steps added!');
-                                LocalDb.addLog(user.id, 'steps', null, 1250, 125);
-                                setLogs(LocalDb.getLogs(user.id));
-                                setProfiles(LocalDb.getProfiles());
-                              }
-                            } catch (err) {
-                              setToast('Google Fit sync completed!');
-                            } finally {
-                              setSaving(false);
-                            }
-                          }}
-                          style={{ background: 'linear-gradient(135deg, #4285F4, #34A853)', border: 'none', color: '#FFF', fontWeight: 700, marginBottom: '8px' }}
-                        >
-                          <Zap size={16} /> Sync Google Fit Background Steps
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (!user) return;
-                            LocalDb.addLog(user.id, 'steps', null, 500, 50);
-                            setLogs(LocalDb.getLogs(user.id));
-                            setProfiles(LocalDb.getProfiles());
-                            setToast('+500 steps logged!');
-                          }}
-                          style={{ background: '#1E293B', border: '1px solid #334155', color: '#FACC15', fontWeight: 700 }}
-                        >
-                          <Plus size={16} /> Quick Add +500 Steps (Test)
-                        </button>
-                        <small>🟢 Motion Sensor & Google Fit Background Sync Active.</small>
+                        <small>🟢 Motion Sensor Active in background.</small>
                       </div>
 
                       <div className="white-panel account-panel">

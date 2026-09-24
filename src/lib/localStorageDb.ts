@@ -38,6 +38,9 @@ export interface Profile {
   steps: number;
   streak: number;
   role: string;
+  height?: number;
+  weight?: number;
+  target_weight?: number;
 }
 
 export interface Log {
@@ -285,17 +288,17 @@ export const LocalDb = {
   getProfileByUserId: (userId: string): Profile | undefined => {
     return LocalDb.getProfiles().find((p) => p.user_id === userId);
   },
-  saveProfile: (userId: string, displayName: string, campusId: number): Profile => {
+  saveProfile: (userId: string, displayName: string, campusId: number, height?: number, weight?: number, targetWeight?: number): Profile => {
     const profiles = LocalDb.getProfiles();
     const existing = profiles.find((p) => p.user_id === userId);
     if (existing) {
       const updated = profiles.map((p) =>
         p.user_id === userId
-          ? { ...p, display_name: displayName, campus_id: campusId }
+          ? { ...p, display_name: displayName, campus_id: campusId, height: height || p.height, weight: weight || p.weight, target_weight: targetWeight || p.target_weight }
           : p
       );
       setItem("fc_profiles", updated);
-      return { ...existing, display_name: displayName, campus_id: campusId };
+      return { ...existing, display_name: displayName, campus_id: campusId, height: height || existing.height, weight: weight || existing.weight, target_weight: targetWeight || existing.target_weight };
     } else {
       const newProfile: Profile = {
         id: Date.now(),
@@ -306,6 +309,9 @@ export const LocalDb = {
         steps: 0,
         streak: 1,
         role: displayName.toLowerCase().includes("admin") ? "admin" : "student",
+        height: height || 175,
+        weight: weight || 70,
+        target_weight: targetWeight || 65,
       };
       setItem("fc_profiles", [...profiles, newProfile]);
       return newProfile;
