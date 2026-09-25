@@ -7,6 +7,7 @@ import {
   Bell,
   Camera,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -24,6 +25,7 @@ import {
   Pause,
   Play,
   Plus,
+  RotateCcw,
   Send,
   Settings2,
   Shield,
@@ -681,17 +683,26 @@ function WorkoutArt({ workout, large = false }: { workout: Workout; large?: bool
   );
 }
 
-function CameraCounter({ onClose }: { onClose: () => void }) {
+function CameraCounter({
+  initialExercise = 'squats',
+  onClose,
+  onSaveDailyReps,
+}: {
+  initialExercise?: 'squats' | 'pushups';
+  onClose: () => void;
+  onSaveDailyReps: (exercise: 'squats' | 'pushups', reps: number) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef<number>(0);
-  const [exercise, setExercise] = useState<'squats' | 'pushups'>('squats');
+  const [exercise, setExercise] = useState<'squats' | 'pushups'>(initialExercise);
   const [count, setCount] = useState(0);
   const [status, setStatus] = useState('Initializing Google MediaPipe Pose AI…');
   const [active, setActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [aiEngine, setAiEngine] = useState('Google MediaPipe Pose AI');
+  const [savedMsg, setSavedMsg] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -881,11 +892,11 @@ function CameraCounter({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="filter-row" style={{ marginBottom: '12px' }}>
-          <button className={exercise === 'squats' ? 'active' : ''} onClick={() => { setExercise('squats'); setCount(0); }}>
+          <button className={exercise === 'squats' ? 'active' : ''} onClick={() => { setExercise('squats'); setCount(0); setSavedMsg(''); }}>
             🦵 Squats (Knee Angle)
           </button>
-          <button className={exercise === 'pushups' ? 'active' : ''} onClick={() => { setExercise('pushups'); setCount(0); }}>
-            💪 Pushups / Curls (Elbow Angle)
+          <button className={exercise === 'pushups' ? 'active' : ''} onClick={() => { setExercise('pushups'); setCount(0); setSavedMsg(''); }}>
+            💪 Pushups (Elbow Angle)
           </button>
         </div>
 
@@ -906,13 +917,57 @@ function CameraCounter({ onClose }: { onClose: () => void }) {
 
         <div className="camera-stats">
           <div>
-            <strong style={{ color: '#10B981' }}>{count}</strong>
-            <span>ACCURATE REPS</span>
+            <strong style={{ color: exercise === 'squats' ? '#F59E0B' : '#10B981' }}>{count}</strong>
+            <span>ACCURATE {exercise.toUpperCase()} REPS</span>
           </div>
           <p>{status}</p>
-          <button className="secondary-btn" onClick={() => setCount(0)}>
-            Reset count
-          </button>
+
+          {savedMsg && (
+            <div style={{ color: '#10B981', fontWeight: 700, fontSize: '13px', margin: '4px 0 8px 0' }}>
+              {savedMsg}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '6px' }}>
+            <button
+              className="secondary-btn"
+              onClick={() => {
+                setCount(0);
+                setSavedMsg('');
+              }}
+              style={{ flex: 1, justifyContent: 'center', gap: '6px' }}
+            >
+              <RotateCcw size={16} /> Reset Reps
+            </button>
+            <button
+              onClick={() => {
+                if (count > 0) {
+                  onSaveDailyReps(exercise, count);
+                  setSavedMsg(`✓ Added +${count} ${exercise === 'squats' ? 'Squats' : 'Pushups'} to today's box!`);
+                  setCount(0);
+                  setTimeout(() => setSavedMsg(''), 4000);
+                }
+              }}
+              disabled={count === 0}
+              style={{
+                flex: 1.3,
+                justifyContent: 'center',
+                background: count > 0 ? '#10B981' : '#374151',
+                color: count > 0 ? '#000' : '#9CA3AF',
+                fontWeight: 700,
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border: 'none',
+                cursor: count > 0 ? 'pointer' : 'not-allowed',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: count === 0 ? 0.6 : 1,
+              }}
+            >
+              <CheckCircle2 size={16} /> Done Reps
+            </button>
+          </div>
         </div>
 
         <p className="camera-disclaimer">
@@ -943,7 +998,47 @@ function FitnessApp() {
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'squats' | 'pushups' | null>(null);
+
+  const [dailyReps, setDailyReps] = useState<{ date: string; pushups: number; squats: number }>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const raw = localStorage.getItem('fitcampus_daily_reps');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.date === today) {
+          return { date: today, pushups: Number(parsed.pushups) || 0, squats: Number(parsed.squats) || 0 };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { date: today, pushups: 0, squats: 0 };
+  });
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (dailyReps.date !== today) {
+      const fresh = { date: today, pushups: 0, squats: 0 };
+      setDailyReps(fresh);
+      localStorage.setItem('fitcampus_daily_reps', JSON.stringify(fresh));
+    }
+  }, [dailyReps.date]);
+
+  const handleSaveDailyReps = (exercise: 'squats' | 'pushups', count: number) => {
+    if (count <= 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    setDailyReps((prev) => {
+      const base = prev.date === today ? prev : { date: today, pushups: 0, squats: 0 };
+      const next = {
+        ...base,
+        [exercise]: base[exercise] + count,
+      };
+      localStorage.setItem('fitcampus_daily_reps', JSON.stringify(next));
+      return next;
+    });
+    setToast(`🎉 Added +${count} ${exercise === 'squats' ? 'Squats' : 'Pushups'} to today's box!`);
+  };
 
   const [stepTracking, setStepTracking] = useState(false);
   const [sessionSteps, setSessionSteps] = useState(0);
@@ -1427,17 +1522,16 @@ Student Question: ${promptText}`,
             </button>
           ))}
         </nav>
-        <div className="side-section-label side-section-second">MORE</div>
-        <nav>
-          {profile.role === 'admin' && (
-            <button className={`side-link ${tab === 'admin' ? 'selected' : ''}`} onClick={() => switchTab('admin')}>
-              <Shield size={19} /> Admin portal
-            </button>
-          )}
-          <button className="side-link" onClick={() => switchTab('profile')}>
-            <Settings2 size={19} /> Settings
-          </button>
-        </nav>
+        {profile.role === 'admin' && (
+          <>
+            <div className="side-section-label side-section-second">MORE</div>
+            <nav>
+              <button className={`side-link ${tab === 'admin' ? 'selected' : ''}`} onClick={() => switchTab('admin')}>
+                <Shield size={19} /> Admin portal
+              </button>
+            </nav>
+          </>
+        )}
         <div className="side-bottom">
           <div className="side-promo">
             <div className="side-promo-icon">
@@ -1689,6 +1783,92 @@ Student Question: ${promptText}`,
                     </span>
                   </div>
 
+                  <div className="section-row workout-section" style={{ marginTop: '24px' }}>
+                    <div>
+                      <span className="eyebrow">DAILY AI REPETITION TRACKER</span>
+                      <h2>Today's Workout Boxes</h2>
+                    </div>
+                    <span className="section-caption">Resets automatically every day at midnight</span>
+                  </div>
+
+                  <div className="stats-grid" style={{ marginBottom: '32px', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                    <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(16, 185, 129, 0.02) 100%)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '20px', padding: '20px' }}>
+                      <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="stat-icon green" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.2)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Dumbbell size={22} />
+                          </span>
+                          <span className="stat-label" style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.05em' }}>PUSHUPS BOX</span>
+                        </div>
+                        <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.2)', color: '#10B981', padding: '3px 8px', borderRadius: '20px', fontWeight: 700 }}>TODAY</span>
+                      </div>
+                      <div style={{ fontSize: '42px', fontWeight: 900, color: '#10B981', margin: '14px 0 4px 0', lineHeight: 1 }}>
+                        {dailyReps.pushups} <span style={{ fontSize: '18px', fontWeight: 600, color: 'var(--fg-muted)' }}>reps</span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--fg-muted)', marginBottom: '18px' }}>
+                        Tracked live with MediaPipe Pose AI (Elbows)
+                      </p>
+                      <button
+                        onClick={() => setCameraMode('pushups')}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '12px',
+                          background: '#10B981',
+                          color: '#000',
+                          border: 'none',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                        }}
+                      >
+                        <Camera size={18} /> Start Pushups Camera
+                      </button>
+                    </div>
+
+                    <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(245, 158, 11, 0.02) 100%)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '20px', padding: '20px' }}>
+                      <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span className="stat-icon amber" style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Flame size={22} />
+                          </span>
+                          <span className="stat-label" style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.05em' }}>SQUATS BOX</span>
+                        </div>
+                        <span style={{ fontSize: '11px', background: 'rgba(245, 158, 11, 0.2)', color: '#F59E0B', padding: '3px 8px', borderRadius: '20px', fontWeight: 700 }}>TODAY</span>
+                      </div>
+                      <div style={{ fontSize: '42px', fontWeight: 900, color: '#F59E0B', margin: '14px 0 4px 0', lineHeight: 1 }}>
+                        {dailyReps.squats} <span style={{ fontSize: '18px', fontWeight: 600, color: 'var(--fg-muted)' }}>reps</span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--fg-muted)', marginBottom: '18px' }}>
+                        Tracked live with MediaPipe Pose AI (Knees)
+                      </p>
+                      <button
+                        onClick={() => setCameraMode('squats')}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '12px',
+                          background: '#F59E0B',
+                          color: '#000',
+                          border: 'none',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                        }}
+                      >
+                        <Camera size={18} /> Start Squats Camera
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="workout-feature">
                     <div>
                       <span className="eyebrow light">TODAY IS A GREAT DAY TO START</span>
@@ -1759,7 +1939,7 @@ Student Question: ${promptText}`,
                       <strong>Try the camera rep counter</strong>
                       <p>Use your camera to estimate reps as you move. No extra equipment needed.</p>
                     </div>
-                    <button onClick={() => setShowCamera(true)}>
+                    <button onClick={() => setCameraMode('squats')}>
                       Open camera <ArrowRight size={16} />
                     </button>
                   </div>
@@ -2424,7 +2604,7 @@ Student Question: ${promptText}`,
                 <button className="secondary-btn" onClick={() => setRunning(!running)}>
                   {running ? <Pause size={18} /> : <Play size={18} />} {running ? 'Pause timer' : 'Start timer'}
                 </button>
-                <button className="secondary-btn" onClick={() => setShowCamera(true)}>
+                <button className="secondary-btn" onClick={() => setCameraMode('squats')}>
                   <Camera size={18} /> Rep counter
                 </button>
               </div>
@@ -2437,7 +2617,13 @@ Student Question: ${promptText}`,
         </div>
       )}
 
-      {showCamera && <CameraCounter onClose={() => setShowCamera(false)} />}
+      {cameraMode && (
+        <CameraCounter
+          initialExercise={cameraMode}
+          onClose={() => setCameraMode(null)}
+          onSaveDailyReps={handleSaveDailyReps}
+        />
+      )}
       <AnimatePresence>{toast && <Toast message={toast} onClose={() => setToast('')} />}</AnimatePresence>
       {error && (
         <div className="global-error">
